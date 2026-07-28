@@ -1,3 +1,4 @@
+
 # Chapter 4 — 처리율 제한 장치 설계 (2차 보완 설계)
 
 ## 목차
@@ -201,7 +202,6 @@ sequenceDiagram
 
 ---
 
-## 5-1. 우리 서비스 최종 아키텍처
 
 ```mermaid
 flowchart LR
@@ -284,40 +284,26 @@ TTL 방식으로 시작하고 즉시 전파가 필요해지면 Pub/Sub으로 전
 > 2~5번 고민을 반영해서 달라진 아키텍처를 그린다. 1주차와 달라진 부분이 없다면 그 이유도 함께 적는다.
 
 **1주차 대비 추가된 부분**
-- 처리율 제한 규칙을 로컬 캐시에서 관리 (API Gateway, WAS 각각)
-- 규칙 변경 시 Redis Pub/Sub으로 즉시 전파
 - Race Condition 방지를 위한 루아 스크립트 적용
 
 ```mermaid
 flowchart LR
     C([클라이언트])
     ADM[관리자]
-    R[("Redis\n카운터 + Pub/Sub")]
-
-    subgraph ADMIN["어드민 WAS"]
-        direction TB
-        PUB["Publisher\n(규칙 변경 API)"]
-        RS[("규칙 저장소")]
-        PUB --- RS
-    end
 
     subgraph GW["API Gateway"]
         direction TB
         GRL["IP Rate Limiter"]
         GLC["로컬 캐시\n(IP 규칙)"]
-        GL["Rule Listener"]
         GRL -->|규칙 조회| GLC
-        GL -->|캐시 갱신| GLC
     end
 
     subgraph WAS["비즈니스 WAS"]
         direction TB
         MF["미들웨어\n(Spring Filter)"]
         WLC["로컬 캐시\n(사용자/엔드포인트 규칙)"]
-        WL["Rule Listener"]
         BE["API 엔드포인트"]
         MF -->|규칙 조회| WLC
-        WL -->|캐시 갱신| WLC
         MF --> BE
     end
 
@@ -331,10 +317,6 @@ flowchart LR
     BE -->|200 OK + X-RateLimit-*| C
 
     %% 규칙 업데이트 흐름
-    ADM -->|규칙 변경| PUB
-    PUB -->|PUBLISH| R
-    R -->|메시지 전달| GL
-    R -->|메시지 전달| WL
 
     %% 노드 색상
     classDef redNode    fill:#ff4d4d,stroke:#cc0000,color:#fff
@@ -342,24 +324,14 @@ flowchart LR
     classDef grayNode   fill:#aaaaaa,stroke:#888888,color:#fff
     classDef gwNode     fill:#00b4d8,stroke:#0077b6,color:#fff
     classDef wasNode    fill:#52b788,stroke:#2d6a4f,color:#fff
-    classDef adminNode  fill:#9b72cf,stroke:#6a3fa3,color:#fff
     classDef redisNode  fill:#ff9944,stroke:#cc6600,color:#fff
 
     class E1,E2 redNode
     class C blueNode
     class ADM grayNode
-    class GRL,GLC,GL gwNode
-    class MF,WLC,WL,BE wasNode
-    class PUB,RS adminNode
     class R redisNode
 
     %% 화살표 색상
-    %% 0:PUB-RS, 1:GRL-GLC, 2:GL-GLC, 3:MF-WLC, 4:WL-WLC, 5:MF-BE
-    %% 6:C-GRL, 7:GRL-R, 8:GRL-E1, 9:GRL-MF, 10:MF-R, 11:MF-E2, 12:BE-C
-    %% 13:ADM-PUB, 14:PUB-R, 15:R-GL, 16:R-WL
-    linkStyle 6,9,12 stroke:#4d94ff,stroke-width:2px
-    linkStyle 8,11 stroke:#ff4d4d,stroke-width:2px
-    linkStyle 13,14,15,16 stroke:#aaaaaa,stroke-width:1.5px
 ```
 
 ---
